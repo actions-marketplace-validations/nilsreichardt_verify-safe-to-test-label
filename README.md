@@ -26,12 +26,14 @@ jobs:
       # 1. Reset the gate: Remove label if this is a new commit (synchronize)
       - name: Remove "safe to test" label, if PR is from a fork
         uses: nilsreichardt/remove-safe-to-test-label@v1
+        with:
+          label: "safe to test" # optional, default is "safe to test"
 
       # 2. Check the gate: Stop here if the label isn't present
       - name: Ensure PR has "safe to test" label, if PR is from a fork
         uses: nilsreichardt/verify-safe-to-test-label@v1
         with:
-          label: "safe to test"
+          label: "safe to test" # optional, default is "safe to test"
 
       # 3. Securely run your tests
       - name: Checkout PR code
