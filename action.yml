@@ -1,5 +1,5 @@
 name: 'Verify "safe to test" label'
-description: 'Secret protection for pull_request_target, achieved by verifying whether the PR from a fork has the "safe to test" label.'
+description: 'Secure pull_request_target workflows by requiring maintainer approval for fork-based PRs.'
 inputs:
   label:
     description: 'The name of the label required to pass the check'
