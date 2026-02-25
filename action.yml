@@ -1,8 +1,8 @@
-name: 'Remove "safe to test" label'
-description: 'Removes the "safe to test" label if the PR is a fork and the label is present'
+name: 'Verify "safe to test" label'
+description: 'Secret protection for the pull_request_target, achieved by verifying whether the PR from a fork has the "safe to test" label.'
 inputs:
   label:
-    description: 'The name of the lable that should be removed when it is present'
+    description: 'The name of the label required to pass the check'
     required: false
     default: 'safe to test'
 runs:
