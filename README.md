@@ -1,55 +1,88 @@
 # verify-safe-to-test-label
 
-A GitHub Action to verifies the "safe to test" label is assigned to a PR, if the
-PR is from a fork.
+A GitHub Action that verifies if the `safe to test` label is assigned to a Pull Request before running sensitive steps.
 
-## Motivation
+If you are using `pull_request_target` in your workflows, there is a high probability your repository is vulnerable to secret exfiltration. This action acts as a manual "Gatekeeper" to protect your infrastructure.
 
-When you have GitHub Actions using secrets, these secrets are not available for
-PRs from forks. This is a security feature of GitHub Actions. This means that if
-you have a GitHub Action that is triggered by a PR from a fork, it will fail.
+## Quick Start
 
-The best solution is to not use GitHub secrets in GitHub Actions that are
-triggered by PRs from forks (see the blog article from GitHub Security Lab:
-[Keeping your GitHub Actions and workflows secure Part 1: Preventing pwn
-requests](https://securitylab.github.com/research/github-actions-preventing-pwn-requests/)).
-However, sometimes this is not possible.
-
-A workaround is to add a label to the PR when it is safe to test. This label is
-added by the PR reviewer. Your jobs that are using secrets are only triggered
-when this label is present. Otherwise, the job should fail. This is what this
-GitHub Action does.
-
-This GitHub Action removes the "safe to test" label when the PR is from a fork.
-
-To remove the "safe to test" label when someone pushes a new commit to the PR,
-use the
-[remove-safe-to-test-label](https://github.com/SharezoneApp/verify-safe-to-test-label)
-GitHub Action.
-
-## Usage
+1.  Add the `labeled` type to your `pull_request_target` trigger.
+2.  Add `nilsreichardt/verify-safe-to-test-label@v1` to the start of your job.
+3.  **Highly Recommended:** Pair this with [remove-safe-to-test-label](https://github.com/nilsreichardt/remove-safe-to-test-label) to prevent "Bait & Switch" attacks (where an attacker pushes malicious code _after_ you've already approved the PR).
 
 ```yaml
 on:
-  # This action only works with pull_request and pull_request_target events.
-  # 
-  # For other events, it succeeds with exit code 0.
-  pull_request: # or pull_request_target
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
-  analyze:
+  integration-tests:
     runs-on: ubuntu-latest
+    permissions:
+      # Required for remove-safe-to-test-label
+      contents: read
+      pull-requests: write
     steps:
-      # This will fail if the PR is from a fork and the "safe to test" label is
-      # not present.
+      # 1. Reset the gate: Remove label if this is a new commit (synchronize)
+      - name: Remove "safe to test" label, if PR is from a fork
+        uses: nilsreichardt/remove-safe-to-test-label@v1
+
+      # 2. Check the gate: Stop here if the label isn't present
       - name: Ensure PR has "safe to test" label, if PR is from a fork
-        uses: SharezoneApp/verify-safe-to-test-label@v1
-      
-      - name: Do something with secrets
+        uses: nilsreichardt/verify-safe-to-test-label@v1
+        with:
+          label: "safe to test"
+
+      # 3. Securely run your tests
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+
+      - name: Test with Secrets
+        run: npm install && npm test
+        env:
+          STRIPE_API_KEY: ${{ secrets.STRIPE_API_KEY }}
 ```
 
-### Inputs
+## Motivation: The "Pwn Request"
 
-| Name | Description | Default |
-| ---- | ----------- | ------- |
-| `label` | The label to remove | `safe to test` |
+### The Problem
+
+When you use `pull_request_target`, GitHub grants the runner access to your repository's **Secrets** and a **Read/Write GITHUB_TOKEN**. If your workflow checks out code from the PR author's fork and runs it, you have a critical vulnerability.
+
+> [!CAUTION]
+> **Is your CI/CD pipeline insecure?**
+> You are at risk if all three are true:
+>
+> 1.  You use the `pull_request_target` trigger.
+> 2.  You check out code from the **head** (the fork).
+> 3.  You execute scripts from that code (e.g., `npm install`, `npm test`, `make`, `python setup.py`).
+
+**A note on legacy repositories:** If your repository was created before February 2023, your `GITHUB_TOKEN` likely [has **write-permissions** by default](https://github.blog/changelog/2023-02-02-github-actions-updating-the-default-github_token-permissions-to-read-only/). An attacker could not only steal secrets but also push malicious commits directly to your `main` branch.
+
+### The Solution: The "Label Gate"
+
+The safest path is using the standard `pull_request` trigger, but this hides secrets from forks, often breaking legitimate integration tests.
+
+The **Label Gate** solution allows you to keep `pull_request_target` while adding a human-in-the-loop:
+
+1.  A contributor submits a PR.
+2.  The CI runs but **fails immediately** at the `verify` step.
+3.  A maintainer reviews the code. If it's safe, they add the `safe to test` label.
+4.  The maintainer (or contributor) re-runs the CI. Now the action passes, and secrets are exposed only to the code you've vetted.
+
+---
+
+## Inputs
+
+| Name    | Description                                      | Default        |
+| ------- | ------------------------------------------------ | -------------- |
+| `label` | The name of the label required to pass the check | `safe to test` |
+
+## Recommended Pairings
+
+To ensure a complete security loop, use this in conjunction with:
+
+- **[remove-safe-to-test-label](https://github.com/nilsreichardt/remove-safe-to-test-label):** Automatically strips the label when new commits are pushed, forcing a re-review of any new code changes.
