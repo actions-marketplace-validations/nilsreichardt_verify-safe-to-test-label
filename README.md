@@ -9,7 +9,7 @@ If you are using `pull_request_target` in your workflows, there is a high probab
 ## Quick Start
 
 1.  Add the `labeled` type to your `pull_request_target` trigger.
-2.  Add `nilsreichardt/verify-safe-to-test-label@v2` to the start of your job.
+2.  Add `nilsreichardt/verify-safe-to-test-label@a65b1d76a873fe060b8ece697f238ef8805e6e23` to the start of your job.
 
 ```yaml
 on:
@@ -31,14 +31,14 @@ jobs:
       # 1. Check the gate (and reset it on every workflow run when require-reapproval=true)
       # If the PR is not from a fork, the action will always pass and code is considered as safe to execute.
       - name: Ensure PR has "safe to test" label, if PR is from a fork
-        uses: nilsreichardt/verify-safe-to-test-label@v2
+        uses: nilsreichardt/verify-safe-to-test-label@a65b1d76a873fe060b8ece697f238ef8805e6e23
         with:
           label: "safe to test" # optional, default is "safe to test"
           require-reapproval: true # optional, default is true.
 
       # 2. Securely run your tests
       - name: Checkout PR code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
@@ -63,7 +63,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Ensure PR has "safe to test" label, if PR is from a fork
-        uses: nilsreichardt/verify-safe-to-test-label@v2
+        uses: nilsreichardt/verify-safe-to-test-label@a65b1d76a873fe060b8ece697f238ef8805e6e23
 
   macos-tests:
     needs: verify-safe-to-test-label # This job will only run if the verify-safe-to-test-label job passes
